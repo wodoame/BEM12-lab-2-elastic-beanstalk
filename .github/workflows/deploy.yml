@@ -44,7 +44,7 @@ jobs:
       # ── 5. Create a unique version label ─────────────────────────────
       - name: Generate version label
         id: version
-        run: echo "label=v-${{ github.run_number }}-${{ github.sha }}" >> $GITHUB_OUTPUT
+        run: echo "label=v-${{ github.run_number }}-${{ github.run_attempt }}-${{ github.sha }}" >> $GITHUB_OUTPUT
 
       # ── 6. Package into a ZIP (source bundle) ────────────────────────
       - name: Create deployment ZIP
