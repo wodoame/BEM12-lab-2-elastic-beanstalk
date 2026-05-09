@@ -49,10 +49,14 @@ jobs:
       # ── 6. Package into a ZIP (source bundle) ────────────────────────
       - name: Create deployment ZIP
         run: |
+          jar_file=$(find target -maxdepth 1 -name "*.jar" ! -name "*.original" -print -quit)
+          cp "$jar_file" application.jar
           zip -r deploy-${{ steps.version.outputs.label }}.zip \
-            target/*.jar \
-            Procfile \
-            .ebextensions/   # include if you have EB config files
+            application.jar \
+            Procfile
+          if [ -d .ebextensions ]; then
+            zip -r deploy-${{ steps.version.outputs.label }}.zip .ebextensions/
+          fi
 
       # ── 7. Configure AWS credentials ─────────────────────────────────
       - name: Configure AWS credentials
