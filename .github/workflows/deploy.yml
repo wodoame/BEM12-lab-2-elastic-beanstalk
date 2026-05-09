@@ -5,9 +5,17 @@ on:
     branches:
       - main  # Triggers on every push to main
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      SSM_PARAMETER_PREFIX: /elasticbeanstalk/prod
 
     steps:
       # ── 1. Checkout source code ──────────────────────────────────────
@@ -50,39 +58,45 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      # ── 8. Upload ZIP to S3 ──────────────────────────────────────────
+      # ── 8. Load deployment settings from SSM Parameter Store ─────────
+      - name: Load deployment parameters from SSM
+        run: |
+          echo "EB_APP_NAME=$(aws ssm get-parameter --name "$SSM_PARAMETER_PREFIX/eb-app-name" --query 'Parameter.Value' --output text)" >> $GITHUB_ENV
+          echo "EB_ENV_NAME=$(aws ssm get-parameter --name "$SSM_PARAMETER_PREFIX/eb-env-name" --query 'Parameter.Value' --output text)" >> $GITHUB_ENV
+          echo "S3_BUCKET=$(aws ssm get-parameter --name "$SSM_PARAMETER_PREFIX/s3-bucket" --query 'Parameter.Value' --output text)" >> $GITHUB_ENV
+
+      # ── 9. Upload ZIP to S3 ──────────────────────────────────────────
       - name: Upload bundle to S3
         run: |
           aws s3 cp deploy-${{ steps.version.outputs.label }}.zip \
-            s3://${{ secrets.S3_BUCKET }}/deploys/deploy-${{ steps.version.outputs.label }}.zip
+            s3://$S3_BUCKET/deploy-${{ steps.version.outputs.label }}.zip
 
-      # ── 9. Create a new EB application version ───────────────────────
+      # ── 10. Create a new EB application version ──────────────────────
       - name: Create Elastic Beanstalk application version
         run: |
           aws elasticbeanstalk create-application-version \
-            --application-name ${{ secrets.EB_APP_NAME }} \
+            --application-name "$EB_APP_NAME" \
             --version-label ${{ steps.version.outputs.label }} \
-            --source-bundle S3Bucket=${{ secrets.S3_BUCKET }},S3Key=deploys/deploy-${{ steps.version.outputs.label }}.zip \
+            --source-bundle S3Bucket="$S3_BUCKET",S3Key=deploy-${{ steps.version.outputs.label }}.zip \
             --no-auto-create-application
 
-      # ── 10. Deploy to Elastic Beanstalk environment ──────────────────
+      # ── 11. Deploy to Elastic Beanstalk environment ──────────────────
       - name: Deploy to Elastic Beanstalk
         run: |
           aws elasticbeanstalk update-environment \
-            --application-name ${{ secrets.EB_APP_NAME }} \
-            --environment-name ${{ secrets.EB_ENV_NAME }} \
+            --application-name "$EB_APP_NAME" \
+            --environment-name "$EB_ENV_NAME" \
             --version-label ${{ steps.version.outputs.label }}
 
-      # ── 11. Wait for deployment to complete ──────────────────────────
+      # ── 12. Wait for deployment to complete ──────────────────────────
       - name: Wait for environment to be ready
         run: |
           aws elasticbeanstalk wait environment-updated \
-            --application-name ${{ secrets.EB_APP_NAME }} \
-            --environment-names ${{ secrets.EB_ENV_NAME }}
+            --application-name "$EB_APP_NAME" \
+            --environment-names "$EB_ENV_NAME"
 
       - name: Deployment complete
         run: echo "✅ Deployed version ${{ steps.version.outputs.label }} successfully!"
