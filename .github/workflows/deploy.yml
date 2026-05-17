@@ -43,19 +43,18 @@ jobs:
 
       # ── 5. Create a unique version label ─────────────────────────────
       - name: Generate version label
-        id: version
-        run: echo "label=v-${{ github.run_number }}-${{ github.run_attempt }}-${{ github.sha }}" >> $GITHUB_OUTPUT
+        run: echo "VERSION_LABEL=v-${{ github.run_number }}-${{ github.run_attempt }}-${{ github.sha }}" >> $GITHUB_ENV
 
       # ── 6. Package into a ZIP (source bundle) ────────────────────────
       - name: Create deployment ZIP
         run: |
           jar_file=$(find target -maxdepth 1 -name "*.jar" ! -name "*.original" -print -quit)
           cp "$jar_file" application.jar
-          zip -r deploy-${{ steps.version.outputs.label }}.zip \
+          zip -r deploy-$VERSION_LABEL.zip \
             application.jar \
             Procfile
           if [ -d .ebextensions ]; then
-            zip -r deploy-${{ steps.version.outputs.label }}.zip .ebextensions/
+            zip -r deploy-$VERSION_LABEL.zip .ebextensions/
           fi
 
       # ── 7. Configure AWS credentials ─────────────────────────────────
@@ -75,16 +74,16 @@ jobs:
       # ── 9. Upload ZIP to S3 ──────────────────────────────────────────
       - name: Upload bundle to S3
         run: |
-          aws s3 cp deploy-${{ steps.version.outputs.label }}.zip \
-            s3://$S3_BUCKET/deploy-${{ steps.version.outputs.label }}.zip
+          aws s3 cp deploy-$VERSION_LABEL.zip \
+            s3://$S3_BUCKET/deploy-$VERSION_LABEL.zip
 
       # ── 10. Create a new EB application version ──────────────────────
       - name: Create Elastic Beanstalk application version
         run: |
           aws elasticbeanstalk create-application-version \
             --application-name "$EB_APP_NAME" \
-            --version-label ${{ steps.version.outputs.label }} \
-            --source-bundle S3Bucket="$S3_BUCKET",S3Key=deploy-${{ steps.version.outputs.label }}.zip \
+            --version-label "$VERSION_LABEL" \
+            --source-bundle S3Bucket="$S3_BUCKET",S3Key=deploy-$VERSION_LABEL.zip \
             --no-auto-create-application
 
       # ── 11. Deploy to Elastic Beanstalk environment ──────────────────
@@ -93,7 +92,7 @@ jobs:
           aws elasticbeanstalk update-environment \
             --application-name "$EB_APP_NAME" \
             --environment-name "$EB_ENV_NAME" \
-            --version-label ${{ steps.version.outputs.label }}
+            --version-label "$VERSION_LABEL"
 
       # ── 12. Wait for deployment to complete ──────────────────────────
       - name: Wait for environment to be ready
@@ -103,4 +102,4 @@ jobs:
             --environment-names "$EB_ENV_NAME"
 
       - name: Deployment complete
-        run: echo "✅ Deployed version ${{ steps.version.outputs.label }} successfully!"
+        run: echo "✅ Deployed version $VERSION_LABEL successfully!"
