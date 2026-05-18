@@ -15,7 +15,7 @@ jobs:
 
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
-      SSM_PARAMETER_PREFIX: /elasticbeanstalk/prod
+      SSM_PARAMETER_PREFIX: /elasticbeanstalk/lab
 
     steps:
       # ── 1. Checkout source code ──────────────────────────────────────
