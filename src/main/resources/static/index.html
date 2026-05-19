@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Book Manager</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f5f6fa;
+      color: #222;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    header h1 { font-size: 1.4rem; font-weight: 600; }
+
+    main { max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
+
+    /* Toast */
+    #toast {
+      position: fixed; top: 1rem; right: 1rem;
+      padding: 0.75rem 1.25rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+      z-index: 1000;
+    }
+    #toast.show { opacity: 1; }
+    #toast.success { background: #22c55e; color: #fff; }
+    #toast.error   { background: #ef4444; color: #fff; }
+
+    /* Form card */
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 1.5rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      margin-bottom: 2rem;
+    }
+    .card h2 { font-size: 1.05rem; margin-bottom: 1rem; color: #1a1a2e; }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 0.3rem; }
+    .form-group label { font-size: 0.8rem; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: .04em; }
+    .form-group input {
+      padding: 0.5rem 0.75rem;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus { outline: none; border-color: #6366f1; }
+
+    .btn-row { display: flex; gap: 0.5rem; }
+    button {
+      padding: 0.55rem 1.2rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.85; }
+    .btn-primary   { background: #6366f1; color: #fff; }
+    .btn-secondary { background: #e5e7eb; color: #333; }
+    .btn-danger    { background: #ef4444; color: #fff; }
+    .btn-edit      { background: #f59e0b; color: #fff; padding: 0.35rem 0.75rem; font-size: 0.8rem; }
+    .btn-delete    { background: #ef4444; color: #fff; padding: 0.35rem 0.75rem; font-size: 0.8rem; }
+    .btn-sm        { padding: 0.35rem 0.75rem; font-size: 0.8rem; }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    thead { background: #1a1a2e; color: #fff; }
+    thead th { padding: 0.75rem 1rem; text-align: left; font-size: 0.82rem; letter-spacing: .05em; text-transform: uppercase; }
+    tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.15s; }
+    tbody tr:hover { background: #f9f9ff; }
+    tbody td { padding: 0.75rem 1rem; font-size: 0.92rem; vertical-align: middle; }
+    .actions { display: flex; gap: 0.4rem; }
+
+    /* Empty state */
+    .empty { text-align: center; padding: 3rem 1rem; color: #aaa; font-size: 0.95rem; }
+
+    /* Loading spinner */
+    .spinner {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 2px solid #ddd;
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.4rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+  <h1>Book Manager</h1>
+</header>
+
+<main>
+  <!-- Form -->
+  <div class="card">
+    <h2 id="form-title">Add a Book</h2>
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="title">Title *</label>
+        <input id="title" type="text" placeholder="e.g. Clean Code" />
+      </div>
+      <div class="form-group">
+        <label for="author">Author *</label>
+        <input id="author" type="text" placeholder="e.g. Robert C. Martin" />
+      </div>
+      <div class="form-group">
+        <label for="isbn">ISBN</label>
+        <input id="isbn" type="text" placeholder="e.g. 978-0-13-468599-1" />
+      </div>
+      <div class="form-group">
+        <label for="publishedYear">Year</label>
+        <input id="publishedYear" type="number" placeholder="e.g. 2008" min="1000" max="2100" />
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="submitForm()">Save Book</button>
+      <button class="btn-secondary" onclick="resetForm()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- List -->
+  <div class="card">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+      <h2>All Books</h2>
+      <button class="btn-secondary btn-sm" onclick="loadBooks()">&#8635; Refresh</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Title</th>
+            <th>Author</th>
+            <th>ISBN</th>
+            <th>Year</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="book-list">
+          <tr><td colspan="6" class="empty"><span class="spinner"></span> Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+  const API = '/api/books';
+  let editingId = null;
+
+  /* ── Toast ── */
+  function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `show ${type}`;
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.className = ''; }, 3000);
+  }
+
+  /* ── Load all books ── */
+  async function loadBooks() {
+    const tbody = document.getElementById('book-list');
+    tbody.innerHTML = '<tr><td colspan="6" class="empty"><span class="spinner"></span> Loading…</td></tr>';
+    try {
+      const res = await fetch(API);
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const books = await res.json();
+      renderBooks(books);
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="6" class="empty">Failed to load books: ${err.message}</td></tr>`;
+    }
+  }
+
+  function renderBooks(books) {
+    const tbody = document.getElementById('book-list');
+    if (!books.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">No books yet. Add one above!</td></tr>';
+      return;
+    }
+    tbody.innerHTML = books.map(b => `
+      <tr>
+        <td>${b.id}</td>
+        <td>${esc(b.title)}</td>
+        <td>${esc(b.author)}</td>
+        <td>${b.isbn ? esc(b.isbn) : '—'}</td>
+        <td>${b.publishedYear ?? '—'}</td>
+        <td>
+          <div class="actions">
+            <button class="btn-edit" onclick="startEdit(${b.id}, ${JSON.stringify(b).replace(/"/g, '&quot;')})">Edit</button>
+            <button class="btn-delete" onclick="deleteBook(${b.id})">Delete</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  /* ── Create / Update ── */
+  async function submitForm() {
+    const title = document.getElementById('title').value.trim();
+    const author = document.getElementById('author').value.trim();
+    const isbn = document.getElementById('isbn').value.trim() || null;
+    const yearRaw = document.getElementById('publishedYear').value.trim();
+    const publishedYear = yearRaw ? parseInt(yearRaw, 10) : null;
+
+    if (!title || !author) { showToast('Title and Author are required.', 'error'); return; }
+
+    const body = { title, author, isbn, publishedYear };
+    const isEdit = editingId !== null;
+    const url = isEdit ? `${API}/${editingId}` : API;
+    const method = isEdit ? 'PUT' : 'POST';
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      showToast(isEdit ? 'Book updated!' : 'Book added!');
+      resetForm();
+      loadBooks();
+    } catch (err) {
+      showToast(`Failed: ${err.message}`, 'error');
+    }
+  }
+
+  /* ── Edit ── */
+  function startEdit(id, book) {
+    editingId = id;
+    document.getElementById('title').value = book.title ?? '';
+    document.getElementById('author').value = book.author ?? '';
+    document.getElementById('isbn').value = book.isbn ?? '';
+    document.getElementById('publishedYear').value = book.publishedYear ?? '';
+    document.getElementById('form-title').textContent = `Editing Book #${id}`;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /* ── Delete ── */
+  async function deleteBook(id) {
+    if (!confirm(`Delete book #${id}?`)) return;
+    try {
+      const res = await fetch(`${API}/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      showToast('Book deleted.');
+      loadBooks();
+    } catch (err) {
+      showToast(`Failed: ${err.message}`, 'error');
+    }
+  }
+
+  /* ── Reset form ── */
+  function resetForm() {
+    editingId = null;
+    ['title', 'author', 'isbn', 'publishedYear'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('form-title').textContent = 'Add a Book';
+  }
+
+  /* ── Escape HTML ── */
+  function esc(str) {
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  loadBooks();
+</script>
+</body>
+</html>
